@@ -1,6 +1,5 @@
 #include "EEPROM.h"
 #include "cc1101.h"
-#include <Servo.h>
 
 #define RFCHANNEL 0
 #define SYNCWORD1 0x64
@@ -15,7 +14,7 @@
 #define STATE_PIN04 1
 #define STATE_PIN07 2
 
-#define USE_SERIAL
+//#define USE_SERIAL
 
 CC1101 cc1101;
 byte currentState;
