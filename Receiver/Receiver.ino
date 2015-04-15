@@ -1,127 +1,75 @@
-//#include <Servo.h>
-#include "EEPROM.h"
-#include "cc1101.h"
+#define RFCHANNEL       0       // Let's use channel 0
+#define SYNCWORD1        0x64    // Synchronization word, high byte
+#define SYNCWORD0        0x32    // Synchronization word, low byte
+#define SOURCE_ADDR      2       // Sender address
 
-#define RFCHANNEL 0
-#define SYNCWORD1 0x64
-#define SYNCWORD0 0x32
-#define SOURCE_ADDR 2
+//#define USE_SERIAL
 
-#define LED_PIN 4
+#define SERVO_PIN 9
+#define MIN_ANGLE 28
+#define MAX_ANGLE 140
 
-#define USE_SERIAL
-#define USE_LED
+#ifdef USE_SERIAL
+	#include <HardwareSerial.h>
+#endif
 
-CC1101 cc1101;
+CCPACKET packet;
 
-//Servo targetServo;
-
-int currentPosition = 0;
-int targetPosition = 0;
-bool steerServoHelper = false;
-
-void rfPacketReceived( void ) {
-
-	CCPACKET packet;	
-	detachInterrupt(0);
-
-	#ifdef USE_LED
-		digitalWrite( LED_PIN , HIGH );
-	#endif
-
-	if( cc1101.receiveData( &packet ) > 0 ) {
-		
-		if( packet.length > 1 ) {
-
-			#ifdef USE_SERIAL
-				Serial.print( "RECEIVED: " );
-				Serial.println( packet.data[1] );
-			#endif
-
-			//targetPosition = packet.data[1];
-			//steerServoHelper = true;
-
-		}
+void rfPacketReceived(CCPACKET *packet) {   
+	if (packet->length > 1) {   
+		digitalWrite( LED , HIGH );
+		#ifdef USE_SERIAL
+			Serial.print( "RECEIVED -> " );
+			Serial.println( packet->data[1] );
+			Serial.flush();
+		#endif
+		int pos = packet->data[1];
+		if( pos > MAX_ANGLE ) pos = MAX_ANGLE;
+		else if( pos < MIN_ANGLE ) pos = MIN_ANGLE;
+		servoPulse( pos );
+		delay( 250 );
+		digitalWrite( LED , LOW );
 	}
-
-	//currentPosition = 0;
-	//targetPosition = 180;
-	//steerServoHelper = true;
-
-	#ifdef USE_LED
-		delay( 1000 );
-		digitalWrite( LED_PIN , LOW );
-	#endif
-
-	attachInterrupt( 0 , rfPacketReceived , FALLING );
-	
 }
 
 void setup() {
-
+	
 	#ifdef USE_SERIAL
 		Serial.begin( 9600 );
-		Serial.println( "LETS GO" );
+		Serial.print( "START" );
 		Serial.flush();
 	#endif
-
-	#ifdef USE_LED
-		pinMode( LED_PIN , OUTPUT );
-		digitalWrite( LED_PIN , HIGH );delay( 1000 );
-		digitalWrite( LED_PIN , LOW );delay( 1000 );
-		digitalWrite( LED_PIN , HIGH );delay( 1000 );
-		digitalWrite( LED_PIN , LOW );
-	#endif
-
-	cc1101.init();
-	cc1101.setChannel( RFCHANNEL , false );
-	cc1101.setSyncWord( SYNCWORD1 , SYNCWORD0 , false );
-	cc1101.setDevAddress( SOURCE_ADDR , false );
-	cc1101.disableAddressCheck();
-
-	attachInterrupt( 0 , rfPacketReceived , FALLING );
 	
+	pinMode(LED, OUTPUT);
+	pinMode( SERVO_PIN , OUTPUT );
+	digitalWrite( LED , HIGH );
+	delay( 1000 );
+	digitalWrite( LED , LOW );
+	delay( 1000 );
+	digitalWrite( LED , HIGH );
+	delay( 1000 );
+	digitalWrite( LED , LOW );
+	
+	panstamp.radio.setChannel(RFCHANNEL);
+	panstamp.radio.setSyncWord(SYNCWORD1, SYNCWORD0);
+	panstamp.radio.setDevAddress(SOURCE_ADDR);
+	panstamp.radio.setCCregs();
+	panstamp.radio.disableAddressCheck();
+	panstamp.setPacketRxCallback(rfPacketReceived);
+	
+	#ifdef USE_SERIAL
+		Serial.print( "READY" );
+		Serial.flush();
+	#endif
 }
 
-void loop() {
-	if( steerServoHelper == true ) {
-		//steerServo();
-		attachInterrupt( 0 , rfPacketReceived , FALLING);
-	}
+void loop() {	
 }
-/*
-void steerServo( ) {
-	//detachInterrupt(0);
-	
-	#ifdef USE_LED
-		digitalWrite( LED_PIN , HIGH );
-	#endif
 
-	targetServo.attach( 9 );
-	
-	if( targetPosition > currentPosition  ) {
-		for( int pos = currentPosition ; pos <= targetPosition ; pos++ ) {
-			targetServo.write( pos );
-			delay( 15 );
-		}
-	} else if( targetPosition < currentPosition ){
-		for( int pos = currentPosition ; pos >= targetPosition ; pos-- ) {
-			targetServo.write( pos );
-			delay( 15 );
-		}
-	}
-	currentPosition = targetPosition;
-	
-	
-	targetServo.detach();
-
-	steerServoHelper = false;
-	
-	#ifdef USE_LED
-		delay( 500 );
-		digitalWrite( LED_PIN , LOW );
-	#endif
-	
-	//attachInterrupt(0, rfPacketReceived, FALLING);
+void servoPulse( int angle) {
+	int pwm = (angle*11) + 500;
+	digitalWrite( 9 , HIGH );
+	delayMicroseconds( pwm );
+	digitalWrite( 9 , LOW );
+	delay( 20 );
 }
-*/
